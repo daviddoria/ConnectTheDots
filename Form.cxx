@@ -90,7 +90,7 @@ Form::Form()
 
 void Form::on_sldDotSize_valueChanged(int value)
 {
-  std::cout << "DotSize changed to " << value << "." << std::endl;
+  //std::cout << "DotSize changed to " << value << "." << std::endl;
   
   for(unsigned int i = 0; i < this->InputPoints->GetNumberOfPoints(); ++i)
     {
@@ -160,12 +160,12 @@ void Form::on_actionOpen_activated()
     this->PointActors.push_back(actor);
    
     }
-    
+  /*
   std::cout << "There are " << reader->GetOutput()->GetNumberOfPoints() << std::endl
 	    << this->Points.size() << " polydata spheres" << std::endl
 	    << this->PointMappers.size() << " mappers" << std::endl
 	    << this->PointActors.size() << " actors" << std::endl;
-    
+  */
    
   this->Contour->SetPoints(reader->GetOutput()->GetPoints());
   this->Lines = vtkSmartPointer<vtkCellArray>::New();
