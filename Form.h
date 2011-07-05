@@ -22,11 +22,12 @@
 #include "ui_Form.h"
 
 // VTK
-#include <vtkSmartPointer.h>
-#include <vtkRenderer.h>
 #include <vtkActor.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkSmartPointer.h>
 
 // Qt
 #include <QMainWindow>
@@ -43,7 +44,9 @@ public:
 public slots:
   void on_actionOpen_activated();
   void on_actionSave_activated();
-
+  void on_sldDotSize_valueChanged(int);
+  void on_sldLineThickness_valueChanged(int);
+  
 protected:
 
   vtkSmartPointer<vtkRenderer> Renderer;
@@ -54,10 +57,15 @@ protected:
   // Create a cell array to store the lines in and add the lines to it
   vtkSmartPointer<vtkCellArray> Lines;
   
+  vtkSmartPointer<vtkPoints> InputPoints;
+  
+  std::vector<vtkSmartPointer<vtkSphereSource> > PointSources;
   std::vector<vtkSmartPointer<vtkActor> > PointActors;
   std::vector<vtkSmartPointer<vtkPolyDataMapper> > PointMappers;
   std::vector<vtkSmartPointer<vtkPolyData> > Points;
   
+  float MaxPointRadius;
+  float MaxLineThickness;
 };
 
 #endif // Form_H

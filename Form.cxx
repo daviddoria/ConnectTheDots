@@ -18,6 +18,7 @@
 
 #include "ui_Form.h"
 #include "Form.h"
+#include "InteractorStyle.h"
 
 // Qt
 #include <QFileDialog>
@@ -51,9 +52,29 @@ Form::Form()
 {
   this->setupUi(this);
 
+  this->MaxPointRadius = 10;
+  this->MaxLineThickness = 10;
+  
   this->Renderer = vtkSmartPointer<vtkRenderer>::New();
 
   this->qvtkWidget->GetRenderWindow()->AddRenderer(this->Renderer);
+  
+  this->InputPoints = vtkSmartPointer<vtkPoints>::New();
+  
+  this->Contour = vtkSmartPointer<vtkPolyData>::New();
+  this->ContourMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+  this->ContourMapper->SetInput(this->Contour);
+  this->ContourActor = vtkSmartPointer<vtkActor>::New();
+  this->ContourActor->GetProperty()->SetColor(1.0, 0.0, 0.0); // red
+  this->ContourActor->SetMapper(this->ContourMapper);
+  this->Renderer->AddActor(this->ContourActor);
+  
+  // Setup interaction  
+  vtkSmartPointer<InteractorStyle> interactorStyle =
+    vtkSmartPointer<InteractorStyle>::New();
+  interactorStyle->SetPoints(&this->PointActors);
+  interactorStyle->SetContour(this->Contour);
+  this->qvtkWidget->GetRenderWindow()->GetInteractor()->SetInteractorStyle(interactorStyle);
   
   // Setup toolbar
   QIcon openIcon = QIcon::fromTheme("document-open");
@@ -66,83 +87,30 @@ Form::Form()
 
 };
 
-// Define interaction style
-class MyInteractorStyle : public vtkInteractorStyleTrackballActor
+
+void Form::on_sldDotSize_valueChanged(int value)
 {
-  public:
-    static MyInteractorStyle* New();
-    vtkTypeMacro(MyInteractorStyle, vtkInteractorStyleTrackballActor);
- 
-    MyInteractorStyle()
+  std::cout << "DotSize changed to " << value << "." << std::endl;
+  
+  for(unsigned int i = 0; i < this->InputPoints->GetNumberOfPoints(); ++i)
     {
-      PreviousId = -1;
+    // Set the radius to the selected percentage of the max radius
+    this->PointSources[i]->SetRadius(this->MaxPointRadius * .01 * value);
+    this->PointSources[i]->Update();
     }
-    
-    virtual void OnLeftButtonDown() 
-    {
-      // Forward events
-      vtkInteractorStyleTrackballActor::OnLeftButtonDown();
-      
-      int selectedId = -1;
-      for(unsigned int i = 0; i < this->Points.size(); ++i)
-	{
-	if(this->InteractionProp == this->Points[i].GetPointer())
-	  {
-	  //std::cout << "Point " << i << " was selected." << std::endl;
-	  selectedId = i;
-	  break;
-	  }
-	}
+  
+  //this->Renderer->ResetCamera();
+  this->Renderer->Render();
+  this->qvtkWidget->GetRenderWindow()->Render();
+  
+}
 
-      if(selectedId == -1)
-	{
-	return;
-	}
-    
-      if(this->PreviousId == -1)
-	{
-	this->PreviousId = selectedId;
-	return;
-	}
-	
-      //std::cout << "Previous: " << this->PreviousId << " Current: " << selectedId << std::endl;
-      
-      // At this point, we should have two valid points to connect
-      vtkSmartPointer<vtkLine> line =
-	vtkSmartPointer<vtkLine>::New();
-      line->GetPointIds()->SetId(0,this->PreviousId);
-      line->GetPointIds()->SetId(1,selectedId);
-      this->Contour->GetLines()->InsertNextCell(line);
-      this->Contour->Modified();
-      
-      //this->Interactor->GetRenderWindow()->GetRenderers()->Render();
-      this->Interactor->GetRenderWindow()->GetRenderers()->GetFirstRenderer()->Render();
-      this->Interactor->GetRenderWindow()->Render();
-
-
-      std::cout << "There are now " << this->Contour->GetNumberOfLines() << " lines." << std::endl;
-      
-      this->PreviousId = selectedId;
-    }
- 
-    virtual void OnLeftButtonUp() 
-    {
-      // Forward events
-      vtkInteractorStyleTrackballActor::OnLeftButtonUp();
-    }
- 
-    //void SetPoints(std::vector<vtkActor*> points) {this->Points = points;}
-    void SetPoints(std::vector<vtkSmartPointer<vtkActor> > points) {this->Points = points;}
-    void SetContour(vtkSmartPointer<vtkPolyData> contour) {this->Contour = contour;}
- 
-  private:
-    //std::vector<vtkActor*> Points;
-    std::vector<vtkSmartPointer<vtkActor> > Points;
-    int PreviousId;
-    vtkSmartPointer<vtkPolyData> Contour;
-};
-vtkStandardNewMacro(MyInteractorStyle);
-
+void Form::on_sldLineThickness_valueChanged(int value)
+{
+  this->ContourActor->GetProperty()->SetLineWidth(this->MaxLineThickness * .01 * value);
+  this->Renderer->Render();
+  this->qvtkWidget->GetRenderWindow()->Render();
+}
 
 void Form::on_actionOpen_activated()
 {
@@ -160,18 +128,24 @@ void Form::on_actionOpen_activated()
   this->PointActors.clear();
   this->PointMappers.clear();
   
+  this->ContourActor->GetProperty()->SetLineWidth(this->MaxLineThickness * .01 * this->sldLineThickness->value());
+  
   vtkSmartPointer<vtkXMLPolyDataReader> reader =
     vtkSmartPointer<vtkXMLPolyDataReader>::New();
   reader->SetFileName(fileName.toStdString().c_str());
   reader->Update();
 
+  this->InputPoints->ShallowCopy(reader->GetOutput()->GetPoints());
+  
   for(unsigned int i = 0; i < reader->GetOutput()->GetNumberOfPoints(); ++i)
     {
     vtkSmartPointer<vtkSphereSource> sphereSource =
       vtkSmartPointer<vtkSphereSource>::New();
+    this->PointSources.push_back(sphereSource);
     double p[3];
     reader->GetOutput()->GetPoint(i,p);
     sphereSource->SetCenter(p);
+    sphereSource->SetRadius(this->MaxPointRadius * .01 * this->sldDotSize->value());
     sphereSource->Update();
     this->Points.push_back(sphereSource->GetOutput());
   
@@ -192,14 +166,7 @@ void Form::on_actionOpen_activated()
 	    << this->PointMappers.size() << " mappers" << std::endl
 	    << this->PointActors.size() << " actors" << std::endl;
     
-  this->ContourActor = vtkSmartPointer<vtkActor>::New();
-  this->ContourActor->GetProperty()->SetColor(1.0, 0.0, 0.0); // red
-  this->ContourMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-  this->Contour = vtkSmartPointer<vtkPolyData>::New();
-  this->ContourMapper->SetInput(this->Contour);
-  this->ContourActor->SetMapper(this->ContourMapper);
-  this->Renderer->AddActor(this->ContourActor);
-    
+   
   this->Contour->SetPoints(reader->GetOutput()->GetPoints());
   this->Lines = vtkSmartPointer<vtkCellArray>::New();
   this->Contour->SetLines(this->Lines);
@@ -213,14 +180,6 @@ void Form::on_actionOpen_activated()
   this->Renderer->Render();
   this->qvtkWidget->GetRenderWindow()->Render();
   
-  
-  vtkSmartPointer<MyInteractorStyle> interactorStyle =
-      vtkSmartPointer<MyInteractorStyle>::New();
-  interactorStyle->SetPoints(this->PointActors);
-  interactorStyle->SetContour(this->Contour);
-  this->qvtkWidget->GetRenderWindow()->GetInteractor()->SetInteractorStyle(interactorStyle);
-  
-
 }
 
 void Form::on_actionSave_activated()

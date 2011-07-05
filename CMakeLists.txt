@@ -14,7 +14,7 @@ INCLUDE(${QT_USE_FILE})
 QT4_WRAP_UI(UISrcs Form.ui)
 QT4_WRAP_CPP(MOCSrcs Form.h)
 
-ADD_EXECUTABLE(ConnectTheDots ConnectTheDots.cpp Form.cxx
+ADD_EXECUTABLE(ConnectTheDots ConnectTheDots.cpp Form.cxx InteractorStyle.cxx
 ${UISrcs} ${MOCSrcs} ${ResourceSrcs})
 TARGET_LINK_LIBRARIES(ConnectTheDots QVTK ${VTK_LIBRARIES}
 ${ITK_LIBRARIES})
